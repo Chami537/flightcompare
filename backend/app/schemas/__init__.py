@@ -106,3 +106,11 @@ class AlertResponse(BaseModel):
     created_at: datetime.datetime | None = None
 
     model_config = {"from_attributes": True}
+
+
+class AirportResponse(BaseModel):
+    code: str = Field(..., examples=["JFK"])
+    name: str = Field(..., examples=["John F. Kennedy International Airport"])
+    city: str = Field(..., examples=["New York"])
+    country: str = Field(..., examples=["United States"])
+    country_code: str = Field(..., examples=["US"])

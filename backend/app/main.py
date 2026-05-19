@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db.session import engine, async_session
 from app.models import Base
-from app.routers import flights, bookmarks, alerts, events
+from app.routers import airports, flights, bookmarks, alerts, events
 from app.scraper.engine import start_browser, stop_browser
 from app.scraper.google_flights import GoogleFlightsScraper
 from app.scraper.rate_limiter import TokenBucket
@@ -72,6 +72,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(airports.router, prefix="/api/v1")
 app.include_router(flights.router, prefix="/api/v1")
 app.include_router(bookmarks.router, prefix="/api/v1")
 app.include_router(alerts.router, prefix="/api/v1")

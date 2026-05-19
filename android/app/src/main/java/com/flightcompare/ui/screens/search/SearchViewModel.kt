@@ -3,7 +3,10 @@ package com.flightcompare.ui.screens.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.flightcompare.data.repository.FlightRepository
+import com.flightcompare.domain.model.AirportSuggestion
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +21,8 @@ data class SearchUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val searchId: String? = null,
+    val originSuggestions: List<AirportSuggestion> = emptyList(),
+    val destinationSuggestions: List<AirportSuggestion> = emptyList(),
 )
 
 @HiltViewModel
@@ -28,8 +33,51 @@ class SearchViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
-    fun updateOrigin(value: String) { _uiState.value = _uiState.value.copy(origin = value) }
-    fun updateDestination(value: String) { _uiState.value = _uiState.value.copy(destination = value) }
+    private var originDebounceJob: Job? = null
+    private var destinationDebounceJob: Job? = null
+
+    fun updateOrigin(value: String) {
+        _uiState.value = _uiState.value.copy(origin = value, originSuggestions = emptyList())
+        originDebounceJob?.cancel()
+        originDebounceJob = viewModelScope.launch {
+            delay(300)
+            if (value.length >= 2) {
+                repository.searchAirports(value)
+                    .onSuccess { suggestions ->
+                        _uiState.value = _uiState.value.copy(originSuggestions = suggestions)
+                    }
+            }
+        }
+    }
+
+    fun updateDestination(value: String) {
+        _uiState.value = _uiState.value.copy(destination = value, destinationSuggestions = emptyList())
+        destinationDebounceJob?.cancel()
+        destinationDebounceJob = viewModelScope.launch {
+            delay(300)
+            if (value.length >= 2) {
+                repository.searchAirports(value)
+                    .onSuccess { suggestions ->
+                        _uiState.value = _uiState.value.copy(destinationSuggestions = suggestions)
+                    }
+            }
+        }
+    }
+
+    fun selectOrigin(airport: AirportSuggestion) {
+        _uiState.value = _uiState.value.copy(
+            origin = airport.code,
+            originSuggestions = emptyList()
+        )
+    }
+
+    fun selectDestination(airport: AirportSuggestion) {
+        _uiState.value = _uiState.value.copy(
+            destination = airport.code,
+            destinationSuggestions = emptyList()
+        )
+    }
+
     fun updateDepartureDate(value: String) { _uiState.value = _uiState.value.copy(departureDate = value) }
     fun updateReturnDate(value: String) { _uiState.value = _uiState.value.copy(returnDate = value) }
     fun clearError() { _uiState.value = _uiState.value.copy(error = null) }

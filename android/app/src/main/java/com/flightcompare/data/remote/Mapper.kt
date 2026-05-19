@@ -68,3 +68,11 @@ fun AlertResponse.toDomain() = Alert(
     currentPriceCents = currentPriceCents,
     isActive = isActive,
 )
+
+fun AirportDto.toDomain() = AirportSuggestion(
+    code = code,
+    name = name,
+    city = city,
+    country = country,
+    countryCode = countryCode,
+)

@@ -44,4 +44,7 @@ interface ApiService {
 
     @DELETE("alerts/{id}")
     suspend fun deleteAlert(@Path("id") id: Int): Response<Unit>
+
+    @GET("airports")
+    suspend fun searchAirports(@Query("q") query: String): List<AirportDto>
 }

@@ -78,6 +78,10 @@ class FlightRepository @Inject constructor(
         Unit
     }
 
+    suspend fun searchAirports(query: String): Result<List<AirportSuggestion>> = runCatching {
+        apiService.searchAirports(query).map { it.toDomain() }
+    }
+
     // Cache methods
     suspend fun cacheOffers(searchId: String, offers: List<OfferDto>) {
         offerDao.insertAll(offers.map { o ->

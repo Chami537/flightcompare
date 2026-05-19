@@ -64,3 +64,11 @@ sealed class SearchState {
     data class Success(val offers: List<Offer>, val flights: Map<String, Flight>) : SearchState()
     data class Error(val message: String) : SearchState()
 }
+
+data class AirportSuggestion(
+    val code: String,
+    val name: String,
+    val city: String,
+    val country: String,
+    val countryCode: String,
+)

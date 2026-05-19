@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,17 +45,57 @@ fun SearchScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Origin
-            OutlinedTextField(
-                value = uiState.origin,
-                onValueChange = viewModel::updateOrigin,
-                label = { Text("From") },
-                placeholder = { Text("e.g. JFK, LAX") },
-                leadingIcon = { Icon(Icons.Default.FlightTakeoff, contentDescription = null) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+            // --- Origin with autocomplete ---
+            var originExpanded by remember { mutableStateOf(false) }
+
+            ExposedDropdownMenuBox(
+                expanded = originExpanded && uiState.originSuggestions.isNotEmpty(),
+                onExpandedChange = { originExpanded = it },
                 modifier = Modifier.fillMaxWidth(),
-            )
+            ) {
+                OutlinedTextField(
+                    value = uiState.origin,
+                    onValueChange = {
+                        viewModel.updateOrigin(it.uppercase())
+                        originExpanded = true
+                    },
+                    label = { Text("From") },
+                    placeholder = { Text("e.g. JFK, LAX") },
+                    leadingIcon = { Icon(Icons.Default.FlightTakeoff, contentDescription = null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                    modifier = Modifier
+                        .menuAnchor(MenuAnchorType.PrimaryEditable)
+                        .fillMaxWidth(),
+                )
+
+                ExposedDropdownMenu(
+                    expanded = originExpanded && uiState.originSuggestions.isNotEmpty(),
+                    onDismissRequest = { originExpanded = false },
+                ) {
+                    uiState.originSuggestions.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = "${suggestion.code}  ${suggestion.city}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                    Text(
+                                        text = suggestion.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                            onClick = {
+                                viewModel.selectOrigin(suggestion)
+                                originExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
 
             // Swap button
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -69,17 +110,57 @@ fun SearchScreen(
                 }
             }
 
-            // Destination
-            OutlinedTextField(
-                value = uiState.destination,
-                onValueChange = viewModel::updateDestination,
-                label = { Text("To") },
-                placeholder = { Text("e.g. LAX, JFK") },
-                leadingIcon = { Icon(Icons.Default.FlightLand, contentDescription = null) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+            // --- Destination with autocomplete ---
+            var destinationExpanded by remember { mutableStateOf(false) }
+
+            ExposedDropdownMenuBox(
+                expanded = destinationExpanded && uiState.destinationSuggestions.isNotEmpty(),
+                onExpandedChange = { destinationExpanded = it },
                 modifier = Modifier.fillMaxWidth(),
-            )
+            ) {
+                OutlinedTextField(
+                    value = uiState.destination,
+                    onValueChange = {
+                        viewModel.updateDestination(it.uppercase())
+                        destinationExpanded = true
+                    },
+                    label = { Text("To") },
+                    placeholder = { Text("e.g. LAX, JFK") },
+                    leadingIcon = { Icon(Icons.Default.FlightLand, contentDescription = null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                    modifier = Modifier
+                        .menuAnchor(MenuAnchorType.PrimaryEditable)
+                        .fillMaxWidth(),
+                )
+
+                ExposedDropdownMenu(
+                    expanded = destinationExpanded && uiState.destinationSuggestions.isNotEmpty(),
+                    onDismissRequest = { destinationExpanded = false },
+                ) {
+                    uiState.destinationSuggestions.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = "${suggestion.code}  ${suggestion.city}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                    Text(
+                                        text = suggestion.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                            onClick = {
+                                viewModel.selectDestination(suggestion)
+                                destinationExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
 
             // Departure Date
             OutlinedTextField(

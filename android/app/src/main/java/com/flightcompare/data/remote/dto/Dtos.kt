@@ -105,3 +105,11 @@ data class AlertRequest(
 data class AlertToggleRequest(
     @SerializedName("is_active") val isActive: Boolean,
 )
+
+data class AirportDto(
+    @SerializedName("code") val code: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("city") val city: String,
+    @SerializedName("country") val country: String,
+    @SerializedName("country_code") val countryCode: String,
+)
