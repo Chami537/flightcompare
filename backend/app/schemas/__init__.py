@@ -44,7 +44,8 @@ class OfferResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class FlightWithOffers(FlightDetail):
+class FlightWithOffers(BaseModel):
+    flight: FlightDetail
     offers: list[OfferResponse] = []
     lowest_price_cents: int | None = None
 

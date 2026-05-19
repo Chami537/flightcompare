@@ -78,12 +78,13 @@ class FlightService:
         )
 
         # Mark as pending
-        _pending_searches[search_id] = {"status": "pending", "offers": []}
+        _pending_searches[search_id] = {"search_id": search_id, "status": "pending", "offers": []}
 
         result = await _cached_scrape(self.scraper, params)
 
         if result.error:
             _pending_searches[search_id] = {
+                "search_id": search_id,
                 "status": "failed",
                 "error": result.error,
                 "offers": [],
@@ -95,6 +96,7 @@ class FlightService:
         await self.db.commit()
 
         _pending_searches[search_id] = {
+            "search_id": search_id,
             "status": "complete",
             "offers": saved_offers,
         }
