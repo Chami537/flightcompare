@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,7 +41,7 @@ fun DetailScreen(
                 title = { Text(uiState.data?.flight?.let { "${it.origin} → ${it.destination}" } ?: "Flight") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
@@ -131,7 +133,7 @@ fun DetailScreen(
                                 onClick = { onViewHistory(flightId) },
                                 modifier = Modifier.weight(1f),
                             ) {
-                                Icon(Icons.Default.TrendingDown, contentDescription = null)
+                                Icon(Icons.AutoMirrored.Filled.TrendingDown, contentDescription = null)
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Price History")
                             }

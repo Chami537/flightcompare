@@ -5,7 +5,7 @@ import com.flightcompare.data.local.dao.OfferDao
 import com.flightcompare.data.local.entity.CachedFlight
 import com.flightcompare.data.local.entity.CachedOffer
 import com.flightcompare.data.remote.ApiService
-import com.flightcompare.data.remote.Mapper.toDomain
+import com.flightcompare.data.remote.toDomain
 import com.flightcompare.data.remote.dto.*
 import com.flightcompare.domain.model.*
 import javax.inject.Inject
@@ -79,7 +79,7 @@ class FlightRepository @Inject constructor(
     }
 
     // Cache methods
-    suspend fun cacheResults(searchId: String, offers: List<OfferDto>, flights: List<FlightDto>) {
+    suspend fun cacheOffers(searchId: String, offers: List<OfferDto>) {
         offerDao.insertAll(offers.map { o ->
             CachedOffer(
                 id = o.id,
@@ -90,22 +90,6 @@ class FlightRepository @Inject constructor(
                 bookingLink = o.bookingLink,
                 source = o.source,
                 scrapedAt = o.scrapedAt,
-            )
-        })
-        flightDao.insertAll(flights.map { f ->
-            CachedFlight(
-                id = f.id,
-                origin = f.origin,
-                destination = f.destination,
-                departureDate = f.departureDate,
-                returnDate = f.returnDate,
-                airline = f.airline,
-                flightNumber = f.flightNumber,
-                departureTime = f.departureTime,
-                arrivalTime = f.arrivalTime,
-                durationMin = f.durationMin,
-                stops = f.stops ?: 0,
-                cabinClass = f.cabinClass ?: "economy",
             )
         })
     }
