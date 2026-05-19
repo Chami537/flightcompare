@@ -1,6 +1,8 @@
+import asyncio
 import logging
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +11,6 @@ from app.models.flight import Flight
 from app.models.offer import Offer
 from app.models.price_snapshot import PriceSnapshot
 from app.models.search_history import SearchHistory
-from app.scraper.cache import cached
 from app.scraper.google_flights import (
     GoogleFlightsScraper,
     ScrapedOffer,
@@ -22,16 +23,11 @@ logger = logging.getLogger(__name__)
 _pending_searches: dict[str, dict] = {}
 
 
-@cached(ttl=1800)
-async def _cached_scrape(scraper: GoogleFlightsScraper, params: SearchParams):
-    """Scrape with cache - duplicate params within 30 min return cached results."""
-    return await scraper.search(params)
-
-
 class FlightService:
-    def __init__(self, db: AsyncSession, scraper: GoogleFlightsScraper | None = None):
+    def __init__(self, db: AsyncSession, scraper: Any = None, kayak_scraper: Any = None):
         self.db = db
         self.scraper = scraper
+        self.kayak_scraper = kayak_scraper
 
     async def search_flights(
         self,
@@ -59,15 +55,6 @@ class FlightService:
         self.db.add(history)
         await self.db.commit()
 
-        if self.scraper is None:
-            # No scraper - check if we have cached data in DB
-            return {
-                "search_id": search_id,
-                "status": "failed",
-                "offers": [],
-                "error": "Scraper not available",
-            }
-
         params = SearchParams(
             origin=origin,
             destination=destination,
@@ -80,19 +67,47 @@ class FlightService:
         # Mark as pending
         _pending_searches[search_id] = {"search_id": search_id, "status": "pending", "offers": []}
 
-        result = await _cached_scrape(self.scraper, params)
+        # Run scrapers in parallel
+        tasks = []
+        if self.scraper:
+            tasks.append(self.scraper.search(params))
+        if self.kayak_scraper:
+            # Build Kayak params (same fields, different class import)
+            kayak_params = self.kayak_scraper._build_url.__self__ or params
+            tasks.append(self.kayak_scraper.search(params))
 
-        if result.error:
+        if not tasks:
+            return {
+                "search_id": search_id,
+                "status": "failed",
+                "offers": [],
+                "error": "No scrapers available",
+            }
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        all_offers: list = []
+        errors: list[str] = []
+        for r in results:
+            if isinstance(r, Exception):
+                logger.error(f"Scraper error: {r}")
+                errors.append(str(r))
+            elif r.error:
+                errors.append(r.error)
+            else:
+                all_offers.extend(r.offers)
+
+        if not all_offers and errors:
             _pending_searches[search_id] = {
                 "search_id": search_id,
                 "status": "failed",
-                "error": result.error,
+                "error": "; ".join(errors),
                 "offers": [],
             }
             return _pending_searches[search_id]
 
         # Persist flights and offers
-        saved_offers = await self._save_offers(search_id, result.offers)
+        saved_offers = await self._save_offers(search_id, all_offers)
         await self.db.commit()
 
         _pending_searches[search_id] = {

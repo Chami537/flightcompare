@@ -104,7 +104,7 @@ fun DetailScreen(
                                     Column {
                                         Text(offer.source, style = MaterialTheme.typography.titleSmall)
                                         Text(
-                                            "Updated: ${offer.bookingLink?.take(30) ?: "N/A"}",
+                                            "Updated: ${offer.scrapedAt ?: "N/A"}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )

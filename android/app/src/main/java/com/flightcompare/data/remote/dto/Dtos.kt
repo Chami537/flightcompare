@@ -44,18 +44,7 @@ data class FlightDto(
 )
 
 data class FlightDetailResponse(
-    @SerializedName("id") val id: String,
-    @SerializedName("origin") val origin: String,
-    @SerializedName("destination") val destination: String,
-    @SerializedName("departure_date") val departureDate: String,
-    @SerializedName("return_date") val returnDate: String?,
-    @SerializedName("airline") val airline: String,
-    @SerializedName("flight_number") val flightNumber: String?,
-    @SerializedName("departure_time") val departureTime: String?,
-    @SerializedName("arrival_time") val arrivalTime: String?,
-    @SerializedName("duration_min") val durationMin: Int?,
-    @SerializedName("stops") val stops: Int?,
-    @SerializedName("cabin_class") val cabinClass: String?,
+    @SerializedName("flight") val flight: FlightDto?,
     @SerializedName("offers") val offers: List<OfferDto>?,
     @SerializedName("lowest_price_cents") val lowestPriceCents: Int?,
 )

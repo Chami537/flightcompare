@@ -21,6 +21,8 @@ data class Offer(
     val priceCents: Int,
     val currency: String,
     val bookingLink: String?,
+    val flightId: String? = null,
+    val scrapedAt: String? = null,
 )
 
 data class FlightWithOffers(

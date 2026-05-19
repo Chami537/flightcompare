@@ -30,6 +30,8 @@ class DetailViewModel @Inject constructor(
 
     private val flightId: String = savedStateHandle.get<String>("flightId") ?: ""
 
+    private var bookmarkId: Int? = null
+
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
@@ -61,16 +63,28 @@ class DetailViewModel @Inject constructor(
 
     fun toggleBookmark() {
         viewModelScope.launch {
-            if (_uiState.value.isBookmarked) {
-                // Find bookmark id and delete - simplified for now
-                _uiState.value = _uiState.value.copy(
-                    isBookmarked = false,
-                    actionMessage = "Bookmark removed",
+            val bmId = bookmarkId
+            if (_uiState.value.isBookmarked && bmId != null) {
+                val result = repository.deleteBookmark(bmId)
+                result.fold(
+                    onSuccess = {
+                        bookmarkId = null
+                        _uiState.value = _uiState.value.copy(
+                            isBookmarked = false,
+                            actionMessage = "Bookmark removed",
+                        )
+                    },
+                    onFailure = { e ->
+                        _uiState.value = _uiState.value.copy(
+                            actionMessage = "Failed: ${e.message}",
+                        )
+                    }
                 )
             } else {
                 val result = repository.createBookmark(flightId)
                 result.fold(
-                    onSuccess = {
+                    onSuccess = { bookmark ->
+                        bookmarkId = bookmark.id
                         _uiState.value = _uiState.value.copy(
                             isBookmarked = true,
                             actionMessage = "Bookmarked!",
@@ -127,8 +141,10 @@ class DetailViewModel @Inject constructor(
             val result = repository.getBookmarks()
             result.fold(
                 onSuccess = { bookmarks ->
+                    val match = bookmarks.firstOrNull { it.flightId == flightId }
+                    bookmarkId = match?.id
                     _uiState.value = _uiState.value.copy(
-                        isBookmarked = bookmarks.any { it.flightId == flightId }
+                        isBookmarked = match != null
                     )
                 },
                 onFailure = { }

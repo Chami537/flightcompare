@@ -10,6 +10,7 @@ from app.models import Base
 from app.routers import airports, flights, bookmarks, alerts, events
 from app.scraper.engine import start_browser, stop_browser
 from app.scraper.google_flights import GoogleFlightsScraper
+from app.scraper.kayak import KayakScraper
 from app.scraper.rate_limiter import TokenBucket
 from app.sse.manager import EventManager
 from app.services.monitor_service import start_monitor, stop_monitor
@@ -37,7 +38,8 @@ async def lifespan(app: FastAPI):
             burst=settings.scraper_burst_limit,
         )
         app.state.scraper = GoogleFlightsScraper(browser, rate_limiter)
-        logger.info("Scraper engine ready")
+        app.state.kayak_scraper = KayakScraper(browser, rate_limiter)
+        logger.info("Scraper engine ready (Google Flights + Kayak)")
     except Exception as e:
         logger.warning(f"Scraper not available (Playwright may not be installed): {e}")
         app.state.scraper = None

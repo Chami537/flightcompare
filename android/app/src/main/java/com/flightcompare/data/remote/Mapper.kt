@@ -24,23 +24,12 @@ fun OfferDto.toDomain() = Offer(
     priceCents = priceCents,
     currency = currency ?: "USD",
     bookingLink = bookingLink,
+    flightId = flightId,
+    scrapedAt = scrapedAt,
 )
 
 fun FlightDetailResponse.toDomain() = FlightWithOffers(
-    flight = Flight(
-        id = id,
-        origin = origin,
-        destination = destination,
-        departureDate = departureDate,
-        returnDate = returnDate,
-        airline = airline,
-        flightNumber = flightNumber,
-        departureTime = departureTime,
-        arrivalTime = arrivalTime,
-        durationMin = durationMin,
-        stops = stops ?: 0,
-        cabinClass = cabinClass ?: "economy",
-    ),
+    flight = flight?.toDomain() ?: Flight("", "", "", "", null, "", null, null, null, null, 0, ""),
     offers = offers?.map { it.toDomain() } ?: emptyList(),
     lowestPriceCents = lowestPriceCents,
 )

@@ -35,6 +35,7 @@ class FlightDetail(FlightBase):
 
 class OfferResponse(BaseModel):
     id: int
+    flight_id: str = ""
     source: str
     price_cents: int
     currency: str = "USD"

@@ -12,7 +12,8 @@ def get_flight_service(
     request: Request, db: AsyncSession = Depends(get_db)
 ) -> FlightService:
     scraper = getattr(request.app.state, "scraper", None)
-    return FlightService(db, scraper)
+    kayak = getattr(request.app.state, "kayak_scraper", None)
+    return FlightService(db, scraper, kayak)
 
 
 @router.post("/search", response_model=SearchResponse)

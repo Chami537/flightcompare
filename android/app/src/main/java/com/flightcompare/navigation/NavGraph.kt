@@ -101,7 +101,8 @@ fun FlightCompareNavHost() {
                     searchId = searchId,
                     onFlightClick = { flightId ->
                         navController.navigate(Route.Detail.create(flightId))
-                    }
+                    },
+                    onBack = { navController.popBackStack() }
                 )
             }
 

@@ -21,6 +21,7 @@ import com.flightcompare.ui.components.LoadingOverlay
 fun ResultsScreen(
     searchId: String,
     onFlightClick: (String) -> Unit,
+    onBack: () -> Unit,
     viewModel: ResultsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -30,7 +31,7 @@ fun ResultsScreen(
             TopAppBar(
                 title = { Text("Results") },
                 navigationIcon = {
-                    IconButton(onClick = { /* back */ }) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -45,18 +46,12 @@ fun ResultsScreen(
                     onRetry = { /* viewModel.retry() */ }
                 )
                 is SearchState.Success -> {
-                    val groupedOffers = state.offers.groupBy { o ->
-                        // group by source for now; ideally by flight
-                        o.bookingLink ?: o.source
-                    }
-
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         items(state.offers) { offer ->
-                            // Simplified result card - shows comparison across platforms
                             ElevatedCard(
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
@@ -78,8 +73,9 @@ fun ResultsScreen(
                                             color = MaterialTheme.colorScheme.primary,
                                         )
                                     }
-                                    offer.bookingLink?.let { url ->
-                                        TextButton(onClick = { onFlightClick(url) }) {
+                                    val fid = offer.flightId
+                                    if (!fid.isNullOrBlank()) {
+                                        TextButton(onClick = { onFlightClick(fid) }) {
                                             Text("View")
                                         }
                                     }
