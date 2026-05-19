@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.venv/
+venv/
+
+# SQLite
+*.db
+
+# Environment
+.env
+.venv
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
