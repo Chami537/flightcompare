@@ -6,6 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from sqlalchemy import delete
+
 from app.db.session import engine
 from app.models import Base
 from app.models.flight import Flight
@@ -14,6 +16,14 @@ from app.models.price_snapshot import PriceSnapshot
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 DemoSession = async_sessionmaker(engine, class_=AsyncSession)
+
+DEMO_FLIGHT_IDS = [f["id"] for f in [
+    {"id": "demo-jfk-lax-ua"},
+    {"id": "demo-jfk-lax-dl"},
+    {"id": "demo-jfk-lax-aa"},
+    {"id": "demo-lax-jfk-b6"},
+    {"id": "demo-sfo-ord-wn"},
+]]
 
 DEMO_FLIGHTS = [
     {
@@ -132,6 +142,11 @@ async def seed():
 
     async with DemoSession() as session:
         async with session.begin():
+            # Clear existing demo data first (idempotent re-runs)
+            await session.execute(delete(PriceSnapshot).where(PriceSnapshot.flight_id.in_(DEMO_FLIGHT_IDS)))
+            await session.execute(delete(Offer).where(Offer.flight_id.in_(DEMO_FLIGHT_IDS)))
+            await session.execute(delete(Flight).where(Flight.id.in_(DEMO_FLIGHT_IDS)))
+
             # Insert flights
             for fdata in DEMO_FLIGHTS:
                 flight = Flight(**fdata)

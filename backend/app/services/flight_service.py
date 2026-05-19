@@ -154,6 +154,8 @@ class FlightService:
                 so.flight.departure_date,
                 so.flight.airline,
                 so.flight.flight_number,
+                so.flight.departure_time,
+                so.flight.arrival_time,
             )
 
             # Upsert flight

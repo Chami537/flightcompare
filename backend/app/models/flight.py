@@ -33,6 +33,11 @@ class Flight(Base):
         departure_date: str,
         airline: str,
         flight_number: str | None = None,
+        departure_time: str | None = None,
+        arrival_time: str | None = None,
     ) -> str:
-        key = f"{origin}|{destination}|{departure_date}|{airline}|{flight_number or ''}"
+        key = (
+            f"{origin}|{destination}|{departure_date}|{airline}"
+            f"|{flight_number or ''}|{departure_time or ''}|{arrival_time or ''}"
+        )
         return hashlib.sha256(key.encode()).hexdigest()[:64]

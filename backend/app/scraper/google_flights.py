@@ -70,21 +70,111 @@ class SearchResult:
 
 
 def _parse_price(text: str) -> int | None:
-    """Parse a price string like '$1,234' to cents (123400)."""
-    m = re.search(r"[\$€£¥]\s*([\d,]+(?:\.\d{2})?)", text)
+    """Parse a price string like '$1,234' or '¥64,651' to cents."""
+    # Match $, €, £, ¥ followed by digits
+    m = re.search(r"[\$\€\£\¥]\s*([\d,]+(?:\.\d{1,2})?)", text)
     if not m:
         return None
     clean = m.group(1).replace(",", "")
     return int(float(clean) * 100)
 
 
+def _parse_currency(text: str) -> str:
+    """Detect currency symbol from price text."""
+    if "¥" in text:
+        return "JPY"
+    if "€" in text:
+        return "EUR"
+    if "£" in text:
+        return "GBP"
+    return "USD"
+
+
 def _parse_duration(text: str) -> int | None:
-    """Parse duration like '5h 30m' to minutes (330)."""
-    h = re.search(r"(\d+)\s*h", text)
-    m = re.search(r"(\d+)\s*m", text)
+    """Parse duration like '5h 30m' or '8 hr 12 min' to minutes."""
+    h = re.search(r"(\d+)\s*(?:h|hr|hour)", text)
+    m = re.search(r"(\d+)\s*(?:m|min|minute)", text)
     hours = int(h.group(1)) if h else 0
     minutes = int(m.group(1)) if m else 0
     return hours * 60 + minutes if (hours or minutes) else None
+
+
+def _parse_aria_label(label: str) -> dict | None:
+    """Parse a Google Flights aria-label string into structured data.
+
+    Example: "From 64651 Japanese yen round trip total. 1 stop flight with American.
+    Leaves John F. Kennedy International Airport at 6:49 AM on Saturday, June 20
+    and arrives at Los Angeles International Airport at 12:01 PM on Saturday, June 20.
+    Total duration 8 hr 12 min."
+    """
+    result: dict = {}
+
+    # Price: "From 64651 Japanese yen" or "From $284.50"
+    price_m = re.search(
+        r"From\s+[\$\€\£\¥]?\s*([\d,]+(?:\.\d{1,2})?)\s*(?:Japanese\s*yen|US\s*dollars?|euros?|pounds?)?",
+        label,
+    )
+    if price_m:
+        clean = price_m.group(1).replace(",", "")
+        result["price_cents"] = int(float(clean) * 100)
+
+        # Currency
+        if "yen" in label[price_m.start() : price_m.end()].lower():
+            result["currency"] = "JPY"
+        elif "euro" in label[price_m.start() : price_m.end()].lower():
+            result["currency"] = "EUR"
+        elif "pound" in label[price_m.start() : price_m.end()].lower():
+            result["currency"] = "GBP"
+        else:
+            result["currency"] = "USD"
+
+    # Stops: "Nonstop flight" or "1 stop flight" or "2 stops"
+    if re.search(r"Nonstop", label):
+        result["stops"] = 0
+    else:
+        stop_m = re.search(r"(\d+)\s*[-]?\s*stop", label)
+        if stop_m:
+            result["stops"] = int(stop_m.group(1))
+
+    # Airline: "with American." or "with United Airlines."
+    airline_m = re.search(r"with\s+([^.]+)\.", label)
+    if airline_m:
+        result["airline"] = airline_m.group(1).strip()
+
+    # Departure time: "at 6:49 AM on"
+    dep_time_m = re.search(r"Leaves.*?at\s+(\d{1,2}:\d{2}[ \s]*(?:AM|PM))", label)
+    if dep_time_m:
+        result["departure_time"] = dep_time_m.group(1).replace(" ", " ")
+
+    # Arrival time: "arrives at 12:01 PM on"
+    arr_time_m = re.search(r"arrives.*?at\s+(\d{1,2}:\d{2}[ \s]*(?:AM|PM))", label)
+    if arr_time_m:
+        result["arrival_time"] = arr_time_m.group(1).replace(" ", " ")
+
+    # Departure date: "on Saturday, June 20"
+    dep_date_m = re.search(r"Leaves.*?on\s+[A-Z][a-z]+day,\s*([A-Z][a-z]+ \d{1,2})", label)
+    if dep_date_m:
+        result["departure_date_str"] = dep_date_m.group(1)
+
+    # Return date: Look for second "on <day>, <month> <day>" after "arrives"
+    arrives_part = label[label.find("arrives"):] if "arrives" in label else ""
+    ret_date_m = re.search(r"on\s+[A-Z][a-z]+day,\s*([A-Z][a-z]+ \d{1,2})", arrives_part)
+    if ret_date_m:
+        result["arrival_date_str"] = ret_date_m.group(1)
+
+    # Duration: "Total duration 8 hr 12 min"
+    dur_m = re.search(r"Total\s+duration\s+([^.]*)", label)
+    if dur_m:
+        dur_text = dur_m.group(1).strip()
+        result["duration_min"] = _parse_duration(dur_text)
+
+    # Round trip or one way
+    if "round trip" in label.lower():
+        result["trip_type"] = "round_trip"
+    elif "one way" in label.lower():
+        result["trip_type"] = "one_way"
+
+    return result if result else None
 
 
 class GoogleFlightsScraper:
@@ -147,6 +237,7 @@ class GoogleFlightsScraper:
     def _build_search_url(self, params: SearchParams) -> str:
         url = (
             f"{settings.google_flights_base_url}?"
+            f"gl=US&hl=en&"
             f"q=Flights+to+{params.destination}+from+{params.origin}+"
             f"on+{params.departure_date}"
         )
@@ -157,114 +248,62 @@ class GoogleFlightsScraper:
     async def _parse_results(self, page, params: SearchParams) -> list[ScrapedOffer]:
         offers: list[ScrapedOffer] = []
 
-        # Google Flights renders results in a complex DOM.
-        # We target common CSS selector patterns.
-        result_items = page.locator(
-            'li[role="listitem"], div[role="listitem"], '
-            'div[class*="flight"], li[class*="result"], '
-            "div.flight-results > div"
-        )
-        count = await result_items.count()
-        logger.info(f"Found {count} potential result items")
+        # Primary approach: Find flight cards by aria-label on .JMc5Xc elements.
+        # Each card has an aria-label like:
+        # "From 64651 Japanese yen round trip total. 1 stop flight with American.
+        #  Leaves ... at 6:49 AM on Saturday, June 20
+        #  and arrives at ... at 12:01 PM on Saturday, June 20.
+        #  Total duration 8 hr 12 min."
+        cards = page.locator(".JMc5Xc")
+        card_count = await cards.count()
+        logger.info(f"Found {card_count} flight cards via .JMc5Xc")
 
-        for i in range(min(count, 30)):
+        for i in range(card_count):
             try:
-                item = result_items.nth(i)
+                card = cards.nth(i)
+                aria_label = await card.get_attribute("aria-label") or ""
 
-                # Extract price
-                price_text = ""
-                price_el = item.locator('[data-gs][class*="price"], span[class*="price"]').first
-                try:
-                    price_text = await price_el.inner_text(timeout=2000)
-                except Exception:
-                    # Try generic price pattern
-                    try:
-                        price_text = await item.locator(
-                            'text=/\\$[\\d,]+/'
-                        ).first.inner_text(timeout=2000)
-                    except Exception:
-                        continue
-
-                price_cents = _parse_price(price_text)
-                if not price_cents:
+                if not aria_label:
+                    # Fallback: try to get text from inner elements
                     continue
 
-                # Extract airline and timing info
-                airline_text = ""
-                try:
-                    airline_text = await item.locator(
-                        '[class*="airline"], span[class*="carrier"]'
-                    ).first.inner_text(timeout=1000)
-                except Exception:
-                    airline_text = "Unknown Airline"
-
-                # Parse departure/arrival times
-                times_text = ""
-                try:
-                    times_text = await item.locator(
-                        '[class*="time"], span[class*="depart"], div[class*="segment"]'
-                    ).first.inner_text(timeout=1000)
-                except Exception:
-                    pass
-
-                # Parse duration
-                duration_text = ""
-                try:
-                    duration_text = await item.locator(
-                        '[class*="duration"], span:has-text("h")'
-                    ).first.inner_text(timeout=1000)
-                except Exception:
-                    pass
-
-                # Parse stops
-                stops_text = ""
-                try:
-                    stops_text = await item.locator(
-                        '[class*="stops"], span:has-text("stop"), span:has-text("Nonstop")'
-                    ).first.inner_text(timeout=1000)
-                except Exception:
-                    pass
-
-                stops = 0
-                if "nonstop" in stops_text.lower():
-                    stops = 0
-                elif "1 stop" in stops_text.lower():
-                    stops = 1
-                elif "2 stop" in stops_text.lower():
-                    stops = 2
-                elif "stop" in stops_text.lower():
-                    stops = 1
-
-                # Parse time values
-                dep_time, arr_time = self._parse_times(times_text)
+                parsed = _parse_aria_label(aria_label)
+                if not parsed or "price_cents" not in parsed:
+                    continue
 
                 flight = ScrapedFlight(
                     origin=params.origin,
                     destination=params.destination,
                     departure_date=params.departure_date,
                     return_date=params.return_date,
-                    airline=airline_text.strip(),
+                    airline=parsed.get("airline", "Unknown Airline"),
                     flight_number=None,
-                    departure_time=dep_time,
-                    arrival_time=arr_time,
-                    duration_min=_parse_duration(duration_text),
-                    stops=stops,
+                    departure_time=parsed.get("departure_time"),
+                    arrival_time=parsed.get("arrival_time"),
+                    duration_min=parsed.get("duration_min"),
+                    stops=parsed.get("stops", 0),
                     cabin_class=params.cabin_class,
                 )
+
+                booking_link = (
+                    f"{settings.google_flights_base_url}?"
+                    f"q=Flights+to+{params.destination}+from+{params.origin}+"
+                    f"on+{params.departure_date}"
+                )
+                if params.return_date:
+                    booking_link += f"+return+{params.return_date}"
 
                 offers.append(
                     ScrapedOffer(
                         flight=flight,
-                        price_cents=price_cents,
-                        currency="USD",
+                        price_cents=parsed["price_cents"],
+                        currency=parsed.get("currency", "USD"),
                         source="Google Flights",
-                        booking_link=f"{settings.google_flights_base_url}?"
-                        f"q=Flights+to+{params.destination}+from+{params.origin}+"
-                        f"on+{params.departure_date}",
+                        booking_link=booking_link,
                     )
                 )
             except Exception as e:
-                logger.debug(f"Failed to parse result item {i}: {e}")
+                logger.debug(f"Failed to parse result card {i}: {e}")
                 continue
 
         return offers
