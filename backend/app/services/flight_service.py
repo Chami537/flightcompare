@@ -1,8 +1,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,11 +10,7 @@ from app.models.flight import Flight
 from app.models.offer import Offer
 from app.models.price_snapshot import PriceSnapshot
 from app.models.search_history import SearchHistory
-from app.scraper.google_flights import (
-    GoogleFlightsScraper,
-    ScrapedOffer,
-    SearchParams,
-)
+from app.scraper.base import BaseScraper, ScrapedOffer, SearchParams
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +19,19 @@ _pending_searches: dict[str, dict] = {}
 
 
 class FlightService:
-    def __init__(self, db: AsyncSession, scraper: Any = None, kayak_scraper: Any = None):
+    def __init__(
+        self,
+        db: AsyncSession,
+        scraper: BaseScraper | None = None,
+        kayak_scraper: BaseScraper | None = None,
+        skyscanner_scraper: BaseScraper | None = None,
+        event_manager: object | None = None,
+    ):
         self.db = db
         self.scraper = scraper
         self.kayak_scraper = kayak_scraper
+        self.skyscanner_scraper = skyscanner_scraper
+        self.event_manager = event_manager
 
     async def search_flights(
         self,
@@ -72,9 +76,9 @@ class FlightService:
         if self.scraper:
             tasks.append(self.scraper.search(params))
         if self.kayak_scraper:
-            # Build Kayak params (same fields, different class import)
-            kayak_params = self.kayak_scraper._build_url.__self__ or params
             tasks.append(self.kayak_scraper.search(params))
+        if self.skyscanner_scraper:
+            tasks.append(self.skyscanner_scraper.search(params))
 
         if not tasks:
             return {
@@ -115,6 +119,17 @@ class FlightService:
             "status": "complete",
             "offers": saved_offers,
         }
+
+        # Broadcast search_complete SSE event
+        if self.event_manager:
+            try:
+                await self.event_manager.send_event(
+                    "search_complete",
+                    {"search_id": search_id, "offer_count": len(saved_offers)},
+                )
+            except Exception:
+                logger.warning("Failed to send search_complete SSE event", exc_info=True)
+
         return _pending_searches[search_id]
 
     async def get_search_status(self, search_id: str) -> dict:
@@ -154,9 +169,11 @@ class FlightService:
         return {"flight": flight, "offers": offers, "lowest_price_cents": lowest}
 
     async def get_price_history(self, flight_id: str, days: int = 30):
+        cutoff = datetime.utcnow() - timedelta(days=days)
         stmt = (
             select(PriceSnapshot)
             .where(PriceSnapshot.flight_id == flight_id)
+            .where(PriceSnapshot.scraped_at >= cutoff)
             .order_by(PriceSnapshot.scraped_at.asc())
         )
         result = await self.db.execute(stmt)

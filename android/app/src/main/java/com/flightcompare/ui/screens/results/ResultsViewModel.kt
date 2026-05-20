@@ -29,6 +29,11 @@ class ResultsViewModel @Inject constructor(
         pollResults()
     }
 
+    fun retry() {
+        _uiState.value = SearchState.Loading
+        pollResults()
+    }
+
     private fun pollResults() {
         viewModelScope.launch {
             var attempts = 0

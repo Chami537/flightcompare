@@ -1,11 +1,19 @@
 import asyncio
 import logging
 import re
-from dataclasses import dataclass, field
 
 from playwright.async_api import Browser
 
 from app.config import settings
+from app.scraper.base import (
+    BaseScraper,
+    ScrapedFlight,
+    ScrapedOffer,
+    SearchParams,
+    SearchResult,
+    parse_duration,
+    parse_price,
+)
 from app.scraper.rate_limiter import TokenBucket
 from app.scraper.user_agents import random_user_agent, random_viewport
 
@@ -26,77 +34,6 @@ window.navigator.permissions.query = (parameters) => (
     originalQuery(parameters)
 );
 """
-
-
-@dataclass
-class ScrapedFlight:
-    origin: str
-    destination: str
-    departure_date: str
-    return_date: str | None
-    airline: str
-    flight_number: str | None
-    departure_time: str | None
-    arrival_time: str | None
-    duration_min: int | None
-    stops: int
-    cabin_class: str = "economy"
-
-
-@dataclass
-class ScrapedOffer:
-    flight: ScrapedFlight
-    price_cents: int
-    currency: str
-    source: str
-    booking_link: str | None = None
-
-
-@dataclass
-class SearchParams:
-    origin: str
-    destination: str
-    departure_date: str
-    return_date: str | None = None
-    passengers: int = 1
-    cabin_class: str = "economy"
-
-
-@dataclass
-class SearchResult:
-    search_id: str
-    offers: list[ScrapedOffer] = field(default_factory=list)
-    error: str | None = None
-
-
-def _parse_price(text: str) -> int | None:
-    """Parse a price string like '$1,234' or '¥64,651' to cents."""
-    # Match $, €, £, ¥ followed by digits
-    m = re.search(r"[\$\€\£\¥]\s*([\d,]+(?:\.\d{1,2})?)", text)
-    if not m:
-        return None
-    clean = m.group(1).replace(",", "")
-    return int(float(clean) * 100)
-
-
-def _parse_currency(text: str) -> str:
-    """Detect currency symbol from price text."""
-    if "¥" in text:
-        return "JPY"
-    if "€" in text:
-        return "EUR"
-    if "£" in text:
-        return "GBP"
-    return "USD"
-
-
-def _parse_duration(text: str) -> int | None:
-    """Parse duration like '5h 30m' or '8 hr 12 min' to minutes."""
-    h = re.search(r"(\d+)\s*(?:h|hr|hour)", text)
-    m = re.search(r"(\d+)\s*(?:m|min|minute)", text)
-    hours = int(h.group(1)) if h else 0
-    minutes = int(m.group(1)) if m else 0
-    return hours * 60 + minutes if (hours or minutes) else None
 
 
 def _parse_aria_label(label: str) -> dict | None:
@@ -166,7 +103,7 @@ def _parse_aria_label(label: str) -> dict | None:
     dur_m = re.search(r"Total\s+duration\s+([^.]*)", label)
     if dur_m:
         dur_text = dur_m.group(1).strip()
-        result["duration_min"] = _parse_duration(dur_text)
+        result["duration_min"] = parse_duration(dur_text)
 
     # Round trip or one way
     if "round trip" in label.lower():
@@ -177,12 +114,8 @@ def _parse_aria_label(label: str) -> dict | None:
     return result if result else None
 
 
-class GoogleFlightsScraper:
+class GoogleFlightsScraper(BaseScraper):
     """Scrapes Google Flights search results using Playwright."""
-
-    def __init__(self, browser: Browser, rate_limiter: TokenBucket):
-        self.browser = browser
-        self.rate_limiter = rate_limiter
 
     async def search(self, params: SearchParams) -> SearchResult:
         await self.rate_limiter.acquire()

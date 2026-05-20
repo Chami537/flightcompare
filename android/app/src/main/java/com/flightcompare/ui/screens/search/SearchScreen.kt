@@ -1,5 +1,6 @@
 package com.flightcompare.ui.screens.search
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,10 +11,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,9 +29,15 @@ fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val focusManager = LocalFocusManager.current
 
-    LaunchedEffect(uiState.searchId) {
-        uiState.searchId?.let { onSearch(it) }
+    // One-shot events
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is SearchEvent.NavigateToResults -> onSearch(event.searchId)
+            }
+        }
     }
 
     Scaffold(
@@ -99,13 +112,7 @@ fun SearchScreen(
 
             // Swap button
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                IconButton(
-                    onClick = {
-                        val dest = uiState.destination
-                        viewModel.updateDestination(uiState.origin)
-                        viewModel.updateOrigin(dest)
-                    }
-                ) {
+                IconButton(onClick = viewModel::swapOriginDestination) {
                     Icon(Icons.Default.SwapVert, contentDescription = "Swap")
                 }
             }
@@ -163,26 +170,110 @@ fun SearchScreen(
             }
 
             // Departure Date
+            val departurePickerState = rememberDatePickerState()
+            var showDeparturePicker by remember { mutableStateOf(false) }
+
             OutlinedTextField(
                 value = uiState.departureDate,
-                onValueChange = viewModel::updateDepartureDate,
+                onValueChange = {},
                 label = { Text("Departure") },
                 placeholder = { Text("YYYY-MM-DD") },
                 leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                trailingIcon = {
+                    if (uiState.departureDate.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.updateDepartureDate("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                        }
+                    }
+                },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                readOnly = true,
+                enabled = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDeparturePicker = true },
             )
 
+            if (showDeparturePicker) {
+                DatePickerDialog(
+                    onDismissRequest = { showDeparturePicker = false },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                departurePickerState.selectedDateMillis?.let { millis ->
+                                    val date = Instant.ofEpochMilli(millis)
+                                        .atZone(ZoneId.of("UTC"))
+                                        .toLocalDate()
+                                    viewModel.updateDepartureDate(date.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                                }
+                                showDeparturePicker = false
+                            }
+                        ) {
+                            Text("OK")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeparturePicker = false }) {
+                            Text("Cancel")
+                        }
+                    },
+                ) {
+                    DatePicker(state = departurePickerState)
+                }
+            }
+
             // Return Date
+            val returnPickerState = rememberDatePickerState()
+            var showReturnPicker by remember { mutableStateOf(false) }
+
             OutlinedTextField(
                 value = uiState.returnDate,
-                onValueChange = viewModel::updateReturnDate,
+                onValueChange = {},
                 label = { Text("Return (optional)") },
                 placeholder = { Text("YYYY-MM-DD") },
                 leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                trailingIcon = {
+                    if (uiState.returnDate.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.updateReturnDate("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                        }
+                    }
+                },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                readOnly = true,
+                enabled = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showReturnPicker = true },
             )
+
+            if (showReturnPicker) {
+                DatePickerDialog(
+                    onDismissRequest = { showReturnPicker = false },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                returnPickerState.selectedDateMillis?.let { millis ->
+                                    val date = Instant.ofEpochMilli(millis)
+                                        .atZone(ZoneId.of("UTC"))
+                                        .toLocalDate()
+                                    viewModel.updateReturnDate(date.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                                }
+                                showReturnPicker = false
+                            }
+                        ) {
+                            Text("OK")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showReturnPicker = false }) {
+                            Text("Cancel")
+                        }
+                    },
+                ) {
+                    DatePicker(state = returnPickerState)
+                }
+            }
 
             // Error
             uiState.error?.let { error ->
@@ -200,7 +291,10 @@ fun SearchScreen(
 
             // Search Button
             Button(
-                onClick = viewModel::search,
+                onClick = {
+                    focusManager.clearFocus()
+                    viewModel.search()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),

@@ -15,6 +15,7 @@ import com.flightcompare.domain.model.SearchState
 import com.flightcompare.ui.components.EmptyState
 import com.flightcompare.ui.components.ErrorBanner
 import com.flightcompare.ui.components.LoadingOverlay
+import com.flightcompare.ui.components.PriceTag
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,10 +41,10 @@ fun ResultsScreen(
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             when (val state = uiState) {
-                is SearchState.Loading -> LoadingOverlay()
+                is SearchState.Loading -> LoadingOverlay(message = "Searching across platforms...")
                 is SearchState.Error -> ErrorBanner(
                     message = state.message,
-                    onRetry = { /* viewModel.retry() */ }
+                    onRetry = viewModel::retry,
                 )
                 is SearchState.Success -> {
                     LazyColumn(
@@ -67,11 +68,7 @@ fun ResultsScreen(
                                             style = MaterialTheme.typography.titleMedium,
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "$${offer.priceCents / 100}.${(offer.priceCents % 100).toString().padStart(2, '0')}",
-                                            style = MaterialTheme.typography.headlineSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
+                                        PriceTag(priceCents = offer.priceCents)
                                     }
                                     val fid = offer.flightId
                                     if (!fid.isNullOrBlank()) {

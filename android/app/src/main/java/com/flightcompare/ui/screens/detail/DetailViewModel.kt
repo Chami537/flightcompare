@@ -17,6 +17,7 @@ data class DetailUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val isBookmarked: Boolean = false,
+    val isActionLoading: Boolean = false,
     val alertPrice: String = "",
     val showAlertDialog: Boolean = false,
     val actionMessage: String? = null,
@@ -62,7 +63,9 @@ class DetailViewModel @Inject constructor(
     }
 
     fun toggleBookmark() {
+        if (_uiState.value.isActionLoading) return
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isActionLoading = true)
             val bmId = bookmarkId
             if (_uiState.value.isBookmarked && bmId != null) {
                 val result = repository.deleteBookmark(bmId)
@@ -71,11 +74,13 @@ class DetailViewModel @Inject constructor(
                         bookmarkId = null
                         _uiState.value = _uiState.value.copy(
                             isBookmarked = false,
+                            isActionLoading = false,
                             actionMessage = "Bookmark removed",
                         )
                     },
                     onFailure = { e ->
                         _uiState.value = _uiState.value.copy(
+                            isActionLoading = false,
                             actionMessage = "Failed: ${e.message}",
                         )
                     }
@@ -87,11 +92,13 @@ class DetailViewModel @Inject constructor(
                         bookmarkId = bookmark.id
                         _uiState.value = _uiState.value.copy(
                             isBookmarked = true,
+                            isActionLoading = false,
                             actionMessage = "Bookmarked!",
                         )
                     },
                     onFailure = { e ->
                         _uiState.value = _uiState.value.copy(
+                            isActionLoading = false,
                             actionMessage = "Failed: ${e.message}",
                         )
                     }
@@ -101,18 +108,22 @@ class DetailViewModel @Inject constructor(
     }
 
     fun setAlert(targetPriceCents: Int) {
+        if (_uiState.value.isActionLoading) return
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isActionLoading = true)
             val result = repository.createAlert(flightId, targetPriceCents)
             result.fold(
                 onSuccess = {
                     _uiState.value = _uiState.value.copy(
                         showAlertDialog = false,
                         alertPrice = "",
+                        isActionLoading = false,
                         actionMessage = "Alert set! We'll notify you when price drops below $${targetPriceCents / 100}.",
                     )
                 },
                 onFailure = { e ->
                     _uiState.value = _uiState.value.copy(
+                        isActionLoading = false,
                         actionMessage = "Failed: ${e.message}",
                     )
                 }

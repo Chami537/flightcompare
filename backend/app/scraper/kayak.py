@@ -1,10 +1,18 @@
 import asyncio
 import logging
 import re
-from dataclasses import dataclass, field
 
 from playwright.async_api import Browser
 
+from app.scraper.base import (
+    BaseScraper,
+    ScrapedFlight,
+    ScrapedOffer,
+    SearchParams,
+    SearchResult,
+    parse_duration,
+    parse_price,
+)
 from app.scraper.rate_limiter import TokenBucket
 from app.scraper.user_agents import random_user_agent, random_viewport
 
@@ -17,69 +25,8 @@ Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
 """
 
 
-@dataclass
-class ScrapedFlight:
-    origin: str
-    destination: str
-    departure_date: str
-    return_date: str | None
-    airline: str
-    flight_number: str | None
-    departure_time: str | None
-    arrival_time: str | None
-    duration_min: int | None
-    stops: int
-    cabin_class: str = "economy"
-
-
-@dataclass
-class ScrapedOffer:
-    flight: ScrapedFlight
-    price_cents: int
-    currency: str
-    source: str
-    booking_link: str | None = None
-
-
-@dataclass
-class SearchParams:
-    origin: str
-    destination: str
-    departure_date: str
-    return_date: str | None = None
-    passengers: int = 1
-    cabin_class: str = "economy"
-
-
-@dataclass
-class SearchResult:
-    search_id: str
-    offers: list[ScrapedOffer] = field(default_factory=list)
-    error: str | None = None
-
-
-def _parse_price(text: str) -> int | None:
-    m = re.search(r"\$\s*([\d,]+(?:\.\d{1,2})?)", text)
-    if not m:
-        return None
-    return int(float(m.group(1).replace(",", "")) * 100)
-
-
-def _parse_duration(text: str) -> int | None:
-    """Parse '8h 12m' or '5h 47m' to minutes."""
-    h = re.search(r"(\d+)\s*h", text)
-    m = re.search(r"(\d+)\s*m", text)
-    hours = int(h.group(1)) if h else 0
-    minutes = int(m.group(1)) if m else 0
-    return hours * 60 + minutes if (hours or minutes) else None
-
-
-class KayakScraper:
+class KayakScraper(BaseScraper):
     """Scrapes Kayak flight search results using Playwright."""
-
-    def __init__(self, browser: Browser, rate_limiter: TokenBucket):
-        self.browser = browser
-        self.rate_limiter = rate_limiter
 
     async def search(self, params: SearchParams) -> SearchResult:
         await self.rate_limiter.acquire()
@@ -153,7 +100,7 @@ class KayakScraper:
         # Find all dollar amounts that are likely result prices
         for i, line in enumerate(lines):
             stripped = line.strip()
-            price_cents = _parse_price(stripped)
+            price_cents = parse_price(stripped)
             if not price_cents or price_cents < 1000:
                 continue
             if not stripped.startswith("$") or len(stripped) > 15:
@@ -202,7 +149,7 @@ class KayakScraper:
                         stops = int(stop_m.group(1))
 
                 # Duration: "8h 12m" or "5h 47m"
-                dur = _parse_duration(l)
+                dur = parse_duration(l)
                 if dur and not duration_min:
                     duration_min = dur
 

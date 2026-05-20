@@ -6,12 +6,18 @@ import com.flightcompare.data.repository.FlightRepository
 import com.flightcompare.domain.model.AirportSuggestion
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+sealed class SearchEvent {
+    data class NavigateToResults(val searchId: String) : SearchEvent()
+}
 
 data class SearchUiState(
     val origin: String = "",
@@ -20,7 +26,6 @@ data class SearchUiState(
     val returnDate: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
-    val searchId: String? = null,
     val originSuggestions: List<AirportSuggestion> = emptyList(),
     val destinationSuggestions: List<AirportSuggestion> = emptyList(),
 )
@@ -32,6 +37,9 @@ class SearchViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
+
+    private val _events = Channel<SearchEvent>(Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
 
     private var originDebounceJob: Job? = null
     private var destinationDebounceJob: Job? = null
@@ -78,6 +86,16 @@ class SearchViewModel @Inject constructor(
         )
     }
 
+    fun swapOriginDestination() {
+        val current = _uiState.value
+        _uiState.value = current.copy(
+            origin = current.destination,
+            destination = current.origin,
+            originSuggestions = emptyList(),
+            destinationSuggestions = emptyList(),
+        )
+    }
+
     fun updateDepartureDate(value: String) { _uiState.value = _uiState.value.copy(departureDate = value) }
     fun updateReturnDate(value: String) { _uiState.value = _uiState.value.copy(returnDate = value) }
     fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
@@ -99,10 +117,8 @@ class SearchViewModel @Inject constructor(
             )
             result.fold(
                 onSuccess = { response ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        searchId = response.searchId,
-                    )
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                    _events.send(SearchEvent.NavigateToResults(response.searchId))
                 },
                 onFailure = { e ->
                     _uiState.value = _uiState.value.copy(

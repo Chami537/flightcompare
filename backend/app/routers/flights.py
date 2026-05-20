@@ -13,7 +13,9 @@ def get_flight_service(
 ) -> FlightService:
     scraper = getattr(request.app.state, "scraper", None)
     kayak = getattr(request.app.state, "kayak_scraper", None)
-    return FlightService(db, scraper, kayak)
+    skyscanner = getattr(request.app.state, "skyscanner_scraper", None)
+    event_manager = getattr(request.app.state, "event_manager", None)
+    return FlightService(db, scraper, kayak, skyscanner, event_manager)
 
 
 @router.post("/search", response_model=SearchResponse)

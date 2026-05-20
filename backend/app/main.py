@@ -11,6 +11,7 @@ from app.routers import airports, flights, bookmarks, alerts, events
 from app.scraper.engine import start_browser, stop_browser
 from app.scraper.google_flights import GoogleFlightsScraper
 from app.scraper.kayak import KayakScraper
+from app.scraper.skyscanner import SkyscannerScraper
 from app.scraper.rate_limiter import TokenBucket
 from app.sse.manager import EventManager
 from app.services.monitor_service import start_monitor, stop_monitor
@@ -33,13 +34,22 @@ async def lifespan(app: FastAPI):
     # Start browser for scraper
     try:
         browser = await start_browser()
-        rate_limiter = TokenBucket(
+        rate_limiter_gf = TokenBucket(
             rate=1.0 / settings.scraper_rate_limit_seconds,
             burst=settings.scraper_burst_limit,
         )
-        app.state.scraper = GoogleFlightsScraper(browser, rate_limiter)
-        app.state.kayak_scraper = KayakScraper(browser, rate_limiter)
-        logger.info("Scraper engine ready (Google Flights + Kayak)")
+        rate_limiter_kayak = TokenBucket(
+            rate=1.0 / settings.scraper_rate_limit_seconds,
+            burst=settings.scraper_burst_limit,
+        )
+        rate_limiter_sky = TokenBucket(
+            rate=1.0 / settings.scraper_rate_limit_seconds,
+            burst=settings.scraper_burst_limit,
+        )
+        app.state.scraper = GoogleFlightsScraper(browser, rate_limiter_gf)
+        app.state.kayak_scraper = KayakScraper(browser, rate_limiter_kayak)
+        app.state.skyscanner_scraper = SkyscannerScraper(browser, rate_limiter_sky)
+        logger.info("Scraper engine ready (Google Flights + Kayak + Skyscanner)")
     except Exception as e:
         logger.warning(f"Scraper not available (Playwright may not be installed): {e}")
         app.state.scraper = None

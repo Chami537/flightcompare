@@ -1,5 +1,7 @@
 package com.flightcompare.ui.screens.detail
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -26,6 +29,7 @@ fun DetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.actionMessage) {
@@ -45,12 +49,22 @@ fun DetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = viewModel::toggleBookmark) {
-                        Icon(
-                            if (uiState.isBookmarked) Icons.Default.Bookmark
-                            else Icons.Default.BookmarkBorder,
-                            contentDescription = "Bookmark",
-                        )
+                    IconButton(
+                        onClick = viewModel::toggleBookmark,
+                        enabled = !uiState.isActionLoading,
+                    ) {
+                        if (uiState.isActionLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                if (uiState.isBookmarked) Icons.Default.Bookmark
+                                else Icons.Default.BookmarkBorder,
+                                contentDescription = "Bookmark",
+                            )
+                        }
                     }
                 },
             )
@@ -58,7 +72,7 @@ fun DetailScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         when {
-            uiState.isLoading -> LoadingOverlay(modifier = Modifier.padding(padding))
+            uiState.isLoading -> LoadingOverlay(message = "Loading flight details...", modifier = Modifier.padding(padding))
             uiState.error != null -> ErrorBanner(
                 message = uiState.error!!,
                 onRetry = viewModel::loadDetail,
@@ -78,7 +92,6 @@ fun DetailScreen(
                             flight = data.flight,
                             lowestPriceCents = data.lowestPriceCents,
                             offers = data.offers.take(4),
-                            onClick = {},
                         )
                     }
 
@@ -111,11 +124,17 @@ fun DetailScreen(
                                     }
                                     Column(horizontalAlignment = Alignment.End) {
                                         PriceTag(priceCents = offer.priceCents)
-                                        TextButton(
-                                            onClick = { /* open booking link */ },
-                                            contentPadding = PaddingValues(0.dp),
-                                        ) {
-                                            Text("Book")
+                                        val bookingUrl = offer.bookingLink
+                                        if (!bookingUrl.isNullOrBlank()) {
+                                            TextButton(
+                                                onClick = {
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(bookingUrl))
+                                                    context.startActivity(intent)
+                                                },
+                                                contentPadding = PaddingValues(0.dp),
+                                            ) {
+                                                Text("Book")
+                                            }
                                         }
                                     }
                                 }
@@ -163,21 +182,28 @@ fun DetailScreen(
                     Column {
                         Text("Get notified when price drops below:")
                         Spacer(modifier = Modifier.height(8.dp))
+                        val isValid = uiState.alertPrice.toDoubleOrNull()?.let { it > 0 } ?: false
+                        val showError = uiState.alertPrice.isNotEmpty() && !isValid
                         OutlinedTextField(
                             value = uiState.alertPrice,
                             onValueChange = viewModel::updateAlertPrice,
                             label = { Text("Target price ($)") },
                             placeholder = { Text("e.g. 250") },
                             singleLine = true,
+                            isError = showError,
+                            supportingText = if (showError) {
+                                { Text("Enter a valid price") }
+                            } else null,
                         )
                     }
                 },
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            val cents = (uiState.alertPrice.toDoubleOrNull() ?: 0.0).times(100).toInt()
+                            val cents = (uiState.alertPrice.toDoubleOrNull()?.times(100)?.toInt()) ?: 0
                             if (cents > 0) viewModel.setAlert(cents)
-                        }
+                        },
+                        enabled = uiState.alertPrice.toDoubleOrNull()?.let { it > 0 } ?: false,
                     ) {
                         Text("Set Alert")
                     }

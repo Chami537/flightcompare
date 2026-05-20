@@ -1,5 +1,10 @@
 package com.flightcompare.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
@@ -28,6 +33,15 @@ import com.flightcompare.ui.screens.detail.DetailScreen
 import com.flightcompare.ui.screens.history.HistoryScreen
 import com.flightcompare.ui.screens.results.ResultsScreen
 import com.flightcompare.ui.screens.search.SearchScreen
+
+private const val ANIM_DURATION = 350
+
+private val slideInRight = slideInHorizontally(animationSpec = tween(ANIM_DURATION)) { it }
+private val slideOutLeft = slideOutHorizontally(animationSpec = tween(ANIM_DURATION)) { -it }
+private val slideInLeft = slideInHorizontally(animationSpec = tween(ANIM_DURATION)) { -it }
+private val slideOutRight = slideOutHorizontally(animationSpec = tween(ANIM_DURATION)) { it }
+private val fadeInAnim = fadeIn(animationSpec = tween(ANIM_DURATION))
+private val fadeOutAnim = fadeOut(animationSpec = tween(ANIM_DURATION / 2))
 
 data class BottomNavItem(
     val route: String,
@@ -82,9 +96,14 @@ fun FlightCompareNavHost() {
         NavHost(
             navController = navController,
             startDestination = Route.Search.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
         ) {
-            composable(Route.Search.route) {
+            // Bottom nav tabs: fade transitions (no slide)
+            composable(
+                Route.Search.route,
+                enterTransition = { fadeInAnim },
+                exitTransition = { fadeOutAnim },
+            ) {
                 SearchScreen(
                     onSearch = { searchId ->
                         navController.navigate(Route.Results.create(searchId))
@@ -92,9 +111,14 @@ fun FlightCompareNavHost() {
                 )
             }
 
+            // Push transitions: slide in from right, out to left
             composable(
                 Route.Results.route,
-                arguments = listOf(navArgument("searchId") { type = NavType.StringType })
+                arguments = listOf(navArgument("searchId") { type = NavType.StringType }),
+                enterTransition = { slideInRight },
+                exitTransition = { fadeOutAnim },
+                popEnterTransition = { fadeInAnim },
+                popExitTransition = { slideOutRight },
             ) { backStackEntry ->
                 val searchId = backStackEntry.arguments?.getString("searchId") ?: return@composable
                 ResultsScreen(
@@ -108,7 +132,11 @@ fun FlightCompareNavHost() {
 
             composable(
                 Route.Detail.route,
-                arguments = listOf(navArgument("flightId") { type = NavType.StringType })
+                arguments = listOf(navArgument("flightId") { type = NavType.StringType }),
+                enterTransition = { slideInRight },
+                exitTransition = { fadeOutAnim },
+                popEnterTransition = { fadeInAnim },
+                popExitTransition = { slideOutRight },
             ) { backStackEntry ->
                 val flightId = backStackEntry.arguments?.getString("flightId") ?: return@composable
                 DetailScreen(
@@ -122,7 +150,11 @@ fun FlightCompareNavHost() {
 
             composable(
                 Route.History.route,
-                arguments = listOf(navArgument("flightId") { type = NavType.StringType })
+                arguments = listOf(navArgument("flightId") { type = NavType.StringType }),
+                enterTransition = { slideInRight },
+                exitTransition = { fadeOutAnim },
+                popEnterTransition = { fadeInAnim },
+                popExitTransition = { slideOutRight },
             ) { backStackEntry ->
                 val flightId = backStackEntry.arguments?.getString("flightId") ?: return@composable
                 HistoryScreen(
@@ -131,7 +163,12 @@ fun FlightCompareNavHost() {
                 )
             }
 
-            composable(Route.Bookmarks.route) {
+            // Bottom nav tabs: fade transitions
+            composable(
+                Route.Bookmarks.route,
+                enterTransition = { fadeInAnim },
+                exitTransition = { fadeOutAnim },
+            ) {
                 BookmarksScreen(
                     onFlightClick = { flightId ->
                         navController.navigate(Route.Detail.create(flightId))
@@ -139,7 +176,11 @@ fun FlightCompareNavHost() {
                 )
             }
 
-            composable(Route.Alerts.route) {
+            composable(
+                Route.Alerts.route,
+                enterTransition = { fadeInAnim },
+                exitTransition = { fadeOutAnim },
+            ) {
                 AlertsScreen(
                     onFlightClick = { flightId ->
                         navController.navigate(Route.Detail.create(flightId))

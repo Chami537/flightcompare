@@ -28,13 +28,13 @@ fun FlightCard(
     flight: Flight,
     lowestPriceCents: Int?,
     offers: List<Offer>,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -159,9 +159,9 @@ fun StopIndicator(stops: Int, modifier: Modifier = Modifier) {
         else -> "$stops stops"
     }
     val color = when (stops) {
-        0 -> Color(0xFF2E7D32)
-        1 -> Color(0xFFE65100)
-        else -> Color(0xFFD32F2F)
+        0 -> MaterialTheme.colorScheme.tertiary
+        1 -> MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+        else -> MaterialTheme.colorScheme.error
     }
     Text(
         text = text,
@@ -172,7 +172,10 @@ fun StopIndicator(stops: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun LoadingOverlay(modifier: Modifier = Modifier) {
+fun LoadingOverlay(
+    message: String = "Loading...",
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -181,7 +184,7 @@ fun LoadingOverlay(modifier: Modifier = Modifier) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Searching across platforms...",
+                text = message,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
