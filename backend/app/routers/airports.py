@@ -18,6 +18,8 @@ try:
     logger.info(f"Loaded {len(AIRPORTS)} airports from {AIRPORTS_FILE}")
 except FileNotFoundError:
     logger.warning("airports.json not found -- airport autocomplete will return empty")
+except json.JSONDecodeError:
+    logger.warning("airports.json is malformed -- airport autocomplete will return empty")
 
 router = APIRouter(prefix="/airports", tags=["airports"])
 

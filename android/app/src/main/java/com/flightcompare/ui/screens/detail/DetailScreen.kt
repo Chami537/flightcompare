@@ -128,8 +128,12 @@ fun DetailScreen(
                                         if (!bookingUrl.isNullOrBlank()) {
                                             TextButton(
                                                 onClick = {
-                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(bookingUrl))
-                                                    context.startActivity(intent)
+                                                    try {
+                                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(bookingUrl))
+                                                        context.startActivity(intent)
+                                                    } catch (_: Exception) {
+                                                        // No browser available — ignore
+                                                    }
                                                 },
                                                 contentPadding = PaddingValues(0.dp),
                                             ) {
@@ -203,7 +207,8 @@ fun DetailScreen(
                             val cents = (uiState.alertPrice.toDoubleOrNull()?.times(100)?.toInt()) ?: 0
                             if (cents > 0) viewModel.setAlert(cents)
                         },
-                        enabled = uiState.alertPrice.toDoubleOrNull()?.let { it > 0 } ?: false,
+                        enabled = (uiState.alertPrice.toDoubleOrNull()?.let { it > 0 } ?: false)
+                            && !uiState.isActionLoading,
                     ) {
                         Text("Set Alert")
                     }

@@ -1,5 +1,6 @@
 package com.flightcompare.ui.screens.search
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.flightcompare.data.repository.FlightRepository
@@ -35,6 +36,10 @@ class SearchViewModel @Inject constructor(
     private val repository: FlightRepository,
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "SearchViewModel"
+    }
+
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
@@ -54,6 +59,7 @@ class SearchViewModel @Inject constructor(
                     .onSuccess { suggestions ->
                         _uiState.value = _uiState.value.copy(originSuggestions = suggestions)
                     }
+                    .onFailure { Log.w(TAG, "Origin airport search failed", it) }
             }
         }
     }
@@ -68,6 +74,7 @@ class SearchViewModel @Inject constructor(
                     .onSuccess { suggestions ->
                         _uiState.value = _uiState.value.copy(destinationSuggestions = suggestions)
                     }
+                    .onFailure { Log.w(TAG, "Destination airport search failed", it) }
             }
         }
     }

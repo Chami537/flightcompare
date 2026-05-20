@@ -132,8 +132,9 @@ fun PriceChart(
     val fillColor = lineColor.copy(alpha = 0.1f)
     val gridColor = MaterialTheme.colorScheme.outlineVariant
 
-    // Selected point index for tooltip
+    // Selected point index and tap coordinates for tooltip
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    var tooltipOffset by remember { mutableStateOf(Offset.Zero) }
 
     // Compute nice Y-axis labels
     val yTickCount = 4
@@ -161,11 +162,15 @@ fun PriceChart(
                         val stepX = chartWidth / (points.size - 1)
                         val index = ((offset.x - leftMarginPx) / stepX).roundToInt()
 
-                        selectedIndex = if (index in points.indices) {
-                            // If tapping the same point, deselect
-                            if (index == selectedIndex) null else index
+                        if (index in points.indices) {
+                            if (index == selectedIndex) {
+                                selectedIndex = null
+                            } else {
+                                selectedIndex = index
+                                tooltipOffset = offset
+                            }
                         } else {
-                            null
+                            selectedIndex = null
                         }
                     }
                 },
@@ -258,21 +263,18 @@ fun PriceChart(
             }
         }
 
-        // Tooltip overlay
+        // Tooltip overlay — positioned near the tap point
         selectedIndex?.let { idx ->
             val point = points[idx]
-            val tooltipX = with(density) {
-                val leftMarginPx = leftMarginDp.toPx()
-                leftMarginDp + (leftMarginPx / density.density).dp // approximate position
-            }
+            val tooltipX = with(density) { tooltipOffset.x.toDp() - 8.dp }
+            val tooltipY = with(density) { tooltipOffset.y.toDp() - 8.dp }
 
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 shadowElevation = 4.dp,
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(top = 8.dp, start = 8.dp),
+                    .offset { IntOffset(tooltipX.roundToPx(), tooltipY.roundToPx()) },
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     val dollars = point.priceCents / 100

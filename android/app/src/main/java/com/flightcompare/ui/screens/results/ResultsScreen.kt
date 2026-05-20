@@ -52,7 +52,7 @@ fun ResultsScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(state.offers) { offer ->
+                        items(state.offers, key = { it.id }) { offer ->
                             ElevatedCard(
                                 modifier = Modifier.fillMaxWidth(),
                             ) {

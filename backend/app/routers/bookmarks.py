@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -17,7 +18,10 @@ async def create_bookmark(
     body: BookmarkRequest,
     service: BookmarkService = Depends(get_bookmark_service),
 ):
-    bookmark = await service.create(body.flight_id, body.note)
+    try:
+        bookmark = await service.create(body.flight_id, body.note)
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="Bookmark already exists for this flight")
     return bookmark
 
 

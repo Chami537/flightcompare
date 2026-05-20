@@ -74,7 +74,8 @@ fun AlertCard(
         onClick = onClick,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            alert.flight?.let { flight ->
+            if (alert.flight != null) {
+                val flight = alert.flight!!
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -139,6 +140,12 @@ fun AlertCard(
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
+            } else {
+                Text(
+                    text = "Flight data unavailable",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

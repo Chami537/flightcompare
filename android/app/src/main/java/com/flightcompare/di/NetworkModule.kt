@@ -41,6 +41,18 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @javax.inject.Named("sse")
+    fun provideSseOkHttpClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.SECONDS)  // no timeout for long-lived SSE
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    @Provides
+    @Singleton
     fun provideRetrofit(client: OkHttpClient, gson: Gson): Retrofit {
         return Retrofit.Builder()
             .baseUrl(BuildConfig.BASE_URL)

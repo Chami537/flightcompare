@@ -37,6 +37,7 @@ class HistoryViewModel @Inject constructor(
     }
 
     fun loadHistory() {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
             val result = repository.getPriceHistory(flightId)
             result.fold(

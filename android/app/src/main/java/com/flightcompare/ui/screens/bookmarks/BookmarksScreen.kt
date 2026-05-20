@@ -70,7 +70,8 @@ fun BookmarkCard(
         onClick = onClick,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            bookmark.flight?.let { flight ->
+            if (bookmark.flight != null) {
+                val flight = bookmark.flight!!
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -98,6 +99,12 @@ fun BookmarkCard(
                         }
                     }
                 }
+            } else {
+                Text(
+                    text = "Flight data unavailable",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

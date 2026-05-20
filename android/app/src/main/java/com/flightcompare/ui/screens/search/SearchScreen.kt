@@ -202,7 +202,7 @@ fun SearchScreen(
                             onClick = {
                                 departurePickerState.selectedDateMillis?.let { millis ->
                                     val date = Instant.ofEpochMilli(millis)
-                                        .atZone(ZoneId.of("UTC"))
+                                        .atZone(ZoneId.systemDefault())
                                         .toLocalDate()
                                     viewModel.updateDepartureDate(date.format(DateTimeFormatter.ISO_LOCAL_DATE))
                                 }
@@ -255,7 +255,7 @@ fun SearchScreen(
                             onClick = {
                                 returnPickerState.selectedDateMillis?.let { millis ->
                                     val date = Instant.ofEpochMilli(millis)
-                                        .atZone(ZoneId.of("UTC"))
+                                        .atZone(ZoneId.systemDefault())
                                         .toLocalDate()
                                     viewModel.updateReturnDate(date.format(DateTimeFormatter.ISO_LOCAL_DATE))
                                 }

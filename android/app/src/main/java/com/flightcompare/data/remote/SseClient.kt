@@ -17,6 +17,7 @@ import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 import kotlin.math.min
 
@@ -42,7 +43,7 @@ sealed class SseEvent {
 
 @Singleton
 class SseClient @Inject constructor(
-    private val okHttpClient: OkHttpClient,
+    @Named("sse") private val okHttpClient: OkHttpClient,
     private val gson: Gson,
 ) {
     companion object {

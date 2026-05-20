@@ -28,7 +28,7 @@ class EventManager:
         """Broadcast a server-sent event to all connected clients."""
         message = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
         disconnected = []
-        for queue in self._queues:
+        for queue in list(self._queues):
             try:
                 await queue.put(message)
             except Exception:

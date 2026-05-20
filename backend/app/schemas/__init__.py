@@ -6,10 +6,18 @@ from pydantic import BaseModel, Field
 class FlightSearchRequest(BaseModel):
     origin: str = Field(..., min_length=3, max_length=10, examples=["JFK"])
     destination: str = Field(..., min_length=3, max_length=10, examples=["LAX"])
-    departure_date: str = Field(..., examples=["2026-06-15"])
+    departure_date: str = Field(
+        ...,
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        examples=["2026-06-15"],
+    )
     return_date: str | None = Field(None, examples=["2026-06-22"])
     passengers: int = Field(default=1, ge=1, le=9)
-    cabin_class: str = Field(default="economy", examples=["economy"])
+    cabin_class: str = Field(
+        default="economy",
+        pattern=r"^(economy|premium_economy|business|first)$",
+        examples=["economy"],
+    )
 
 
 class FlightBase(BaseModel):

@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.bookmark import Bookmark
@@ -18,28 +18,53 @@ class BookmarkService:
         return bookmark
 
     async def list_all(self):
+        # 1 query: all bookmarks
         stmt = select(Bookmark).order_by(Bookmark.created_at.desc())
         result = await self.db.execute(stmt)
         bookmarks = result.scalars().all()
 
-        # Enrich with flight info and current price
+        if not bookmarks:
+            return []
+
+        flight_ids = [bm.flight_id for bm in bookmarks]
+
+        # 1 query: all flights in bulk
+        flight_stmt = select(Flight).where(Flight.id.in_(flight_ids))
+        flight_result = await self.db.execute(flight_stmt)
+        flights_map = {f.id: f for f in flight_result.scalars().all()}
+
+        # 1 query: latest price per flight (window function)
+        latest_price_cte = (
+            select(
+                Offer.flight_id,
+                Offer.price_cents,
+                func.row_number()
+                .over(
+                    partition_by=Offer.flight_id,
+                    order_by=Offer.scraped_at.desc(),
+                )
+                .label("rn"),
+            )
+            .where(Offer.flight_id.in_(flight_ids))
+            .cte()
+        )
+        price_stmt = select(
+            latest_price_cte.c.flight_id,
+            latest_price_cte.c.price_cents,
+        ).where(latest_price_cte.c.rn == 1)
+        price_result = await self.db.execute(price_stmt)
+        prices_map = {row[0]: row[1] for row in price_result}
+
+        # Total: 3 queries regardless of N
         enriched = []
         for bm in bookmarks:
-            flight = await self.db.get(Flight, bm.flight_id)
-            latest_offer = await self.db.execute(
-                select(Offer.price_cents)
-                .where(Offer.flight_id == bm.flight_id)
-                .order_by(Offer.scraped_at.desc())
-                .limit(1)
-            )
-            current_price = latest_offer.scalar_one_or_none()
             enriched.append(
                 {
                     "id": bm.id,
                     "flight_id": bm.flight_id,
-                    "flight": flight,
+                    "flight": flights_map.get(bm.flight_id),
                     "note": bm.note,
-                    "current_price_cents": current_price,
+                    "current_price_cents": prices_map.get(bm.flight_id),
                     "created_at": bm.created_at,
                 }
             )

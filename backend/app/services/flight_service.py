@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,20 @@ logger = logging.getLogger(__name__)
 
 # In-memory store for pending searches
 _pending_searches: dict[str, dict] = {}
+_MAX_PENDING_AGE = 3600  # prune entries older than 1 hour
+
+
+def _prune_pending_searches():
+    """Remove completed/failed entries older than _MAX_PENDING_AGE."""
+    now = datetime.now(timezone.utc)
+    stale = []
+    for search_id, entry in _pending_searches.items():
+        if entry.get("status") in ("complete", "failed"):
+            created_at = entry.get("created_at")
+            if created_at and (now - created_at).total_seconds() > _MAX_PENDING_AGE:
+                stale.append(search_id)
+    for search_id in stale:
+        del _pending_searches[search_id]
 
 
 class FlightService:
@@ -57,7 +71,7 @@ class FlightService:
             cabin_class=cabin_class,
         )
         self.db.add(history)
-        await self.db.commit()
+        # Don't commit yet — commit once after scrapers finish
 
         params = SearchParams(
             origin=origin,
@@ -68,8 +82,16 @@ class FlightService:
             cabin_class=cabin_class,
         )
 
-        # Mark as pending
-        _pending_searches[search_id] = {"search_id": search_id, "status": "pending", "offers": []}
+        # Mark as pending (with timestamp for pruning)
+        _pending_searches[search_id] = {
+            "search_id": search_id,
+            "status": "pending",
+            "offers": [],
+            "created_at": datetime.now(timezone.utc),
+        }
+
+        # Prune old completed/failed entries
+        _prune_pending_searches()
 
         # Run scrapers in parallel
         tasks = []

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -59,7 +59,7 @@ async def get_flight_detail(
 @router.get("/{flight_id}/prices")
 async def get_price_history(
     flight_id: str,
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     service: FlightService = Depends(get_flight_service),
 ):
     flight = await service.get_flight_detail(flight_id)

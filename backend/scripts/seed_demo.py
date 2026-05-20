@@ -2,6 +2,7 @@
 
 import asyncio
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -119,21 +120,25 @@ DEMO_OFFERS = [
     {"search_id": "demo-search-3", "flight_id": "demo-sfo-ord-wn", "price_cents": 20100, "source": "Southwest.com"},
 ]
 
-DEMO_PRICE_HISTORY = [
-    {"flight_id": "demo-jfk-lax-ua", "price_cents": 31200, "source_website": "Google Flights"},
-    {"flight_id": "demo-jfk-lax-ua", "price_cents": 30500, "source_website": "Google Flights"},
-    {"flight_id": "demo-jfk-lax-ua", "price_cents": 29800, "source_website": "Google Flights"},
-    {"flight_id": "demo-jfk-lax-ua", "price_cents": 29200, "source_website": "Google Flights"},
-    {"flight_id": "demo-jfk-lax-ua", "price_cents": 28450, "source_website": "Google Flights"},
-    {"flight_id": "demo-jfk-lax-dl", "price_cents": 34500, "source_website": "Google Flights"},
-    {"flight_id": "demo-jfk-lax-dl", "price_cents": 33800, "source_website": "Google Flights"},
-    {"flight_id": "demo-jfk-lax-dl", "price_cents": 32500, "source_website": "Google Flights"},
-    {"flight_id": "demo-jfk-lax-dl", "price_cents": 31200, "source_website": "Google Flights"},
-    {"flight_id": "demo-lax-jfk-b6", "price_cents": 29000, "source_website": "Google Flights"},
-    {"flight_id": "demo-lax-jfk-b6", "price_cents": 28500, "source_website": "Google Flights"},
-    {"flight_id": "demo-lax-jfk-b6", "price_cents": 27500, "source_website": "Google Flights"},
-    {"flight_id": "demo-lax-jfk-b6", "price_cents": 26800, "source_website": "Google Flights"},
-]
+def _make_history(flight_id: str, prices: list[int], source: str = "Google Flights"):
+    """Build price history snapshots with timestamps spread over recent days."""
+    now = datetime.now(timezone.utc)
+    return [
+        {
+            "flight_id": flight_id,
+            "price_cents": price,
+            "source_website": source,
+            "scraped_at": now - timedelta(days=len(prices) - i),
+        }
+        for i, price in enumerate(prices)
+    ]
+
+
+DEMO_PRICE_HISTORY = (
+    _make_history("demo-jfk-lax-ua", [31200, 30500, 29800, 29200, 28450])
+    + _make_history("demo-jfk-lax-dl", [34500, 33800, 32500, 31200])
+    + _make_history("demo-lax-jfk-b6", [29000, 28500, 27500, 26800])
+)
 
 
 async def seed():

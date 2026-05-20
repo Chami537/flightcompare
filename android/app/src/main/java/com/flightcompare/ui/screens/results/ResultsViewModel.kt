@@ -37,10 +37,12 @@ class ResultsViewModel @Inject constructor(
     private fun pollResults() {
         viewModelScope.launch {
             var attempts = 0
+            var consecutiveFailures = 0
             while (attempts < 30) { // max 30 polls (5 min at 10s intervals)
                 val result = repository.getSearchStatus(searchId)
                 result.fold(
                     onSuccess = { response ->
+                        consecutiveFailures = 0  // reset on success
                         when (response.status) {
                             "complete" -> {
                                 val offers = response.offers?.map { it.toDomain() } ?: emptyList()
@@ -64,8 +66,14 @@ class ResultsViewModel @Inject constructor(
                         }
                     },
                     onFailure = { e ->
-                        _uiState.value = SearchState.Error(e.message ?: "Connection error")
-                        return@launch
+                        consecutiveFailures++
+                        if (consecutiveFailures >= 3) {
+                            _uiState.value = SearchState.Error(
+                                "Connection lost after $consecutiveFailures attempts. Check your network."
+                            )
+                            return@launch
+                        }
+                        // Else: transient failure, continue polling
                     }
                 )
                 delay(10_000) // poll every 10s
